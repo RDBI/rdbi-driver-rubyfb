@@ -9,10 +9,10 @@ https://github.com/pilcrow/rdbi-driver-rubyfb
 
 == Related software
 
-* [Ruby](ruby-lang.org)
-* [Firebird SQL](www.firebirdsql.org)
-* [rubyfb](https://github.com/georgiev/rubyfb)
-* [RDBI](http://rdbi.hollensbe.org/)
+* Ruby: ruby-lang.org
+* Firebird: www.firebirdsql.org
+* rubyfb: https://github.com/georgiev/rubyfb
+* RDBI: http://rdbi.hollensbe.org/
 
 == Tested configuration(s)
 

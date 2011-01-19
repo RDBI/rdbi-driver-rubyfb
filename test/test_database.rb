@@ -60,8 +60,10 @@ class TestDatabase < Test::Unit::TestCase
         assert_nothing_raised { res.fetch }
         assert_nothing_raised { res.fetch }
         remainder = res.fetch(:rest)
+        assert_equal([], res.fetch)
+        assert_equal([], res.fetch(5))
       end
     end
-    assert_equal(remainder, [[3, 'third'], [4, 'fourth'], [5, 'fifth']])
+    assert_equal([[3, 'third'], [4, 'fourth'], [5, 'fifth']], remainder)
   end
 end

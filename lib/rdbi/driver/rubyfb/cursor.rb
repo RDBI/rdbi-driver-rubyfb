@@ -2,12 +2,8 @@ require 'rdbi'
 require 'rubyfb'
 
 class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
-  # FIXME - SPEC - RDBI::Result initialized with a fixed SIZE attribute but
-  #         not all drivers will know size/result_count in advance.  SHould be
-  #         dynamically computed
-  #
-  # FIXME - we need to read ahead one row, b/c exhausted? is only set after
-  #         attempting to fetch beyond the result set...
+  # Base class assumes "size" of result set known in advance of fetching
+
   attr_reader :affected_count
 
   def initialize(handle)
@@ -16,9 +12,11 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
 
     # XXX - what is spec here?  Zero or nil for not-applicable counts?
     @affected_count = handle.kind_of?(Numeric) ? handle : 0
-    #puts "#{self.class.name} rows #{result_count}, affected #{affected_count}"
   end
 
+  # Override RDBI::Cursor's default reliance on last_row?
+  # Since we don't know result set size in advance, we don't set
+  # last_row? until we move past the end of the result set...
   def each
     while row = next_row
       yield row
@@ -49,9 +47,12 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
   end
 
   def fetch(count = 1)
-    # FIXME - move common implementation to RDBI::Cursor
-    return [] if last_row?
-    (0...count).collect { next_row }
+    ret = []
+    (0...count).each do
+      break unless row = next_row
+      ret << row
+    end
+    ret
   end
 
   def finish

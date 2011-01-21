@@ -79,7 +79,7 @@ class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
 
   def exec(parameters)
     if parameters.length > 0
-      @fb_stmt.execute_for(*parameters)
+      @fb_stmt.execute_for(parameters)
     else
       @fb_stmt.execute
     end

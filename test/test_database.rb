@@ -7,7 +7,7 @@ class TestDatabase < Test::Unit::TestCase
     @dbh.disconnect if @dbh && @dbh.connected?
   end
 
-  def test_01_connect
+  def test_connect
     self.dbh = new_database
     assert dbh
     assert_kind_of( RDBI::Driver::Rubyfb::Database, dbh )
@@ -17,7 +17,7 @@ class TestDatabase < Test::Unit::TestCase
     assert ! dbh.connected?
   end
 
-  def test_02_ping
+  def test_ping
     self.dbh = new_database
     my_role = role.dup
     driver = my_role.delete(:driver)
@@ -36,9 +36,37 @@ class TestDatabase < Test::Unit::TestCase
     assert_kind_of(Numeric, RDBI.ping(driver, my_role))
   end
 
-  def test_03_setup
-    assert_nothing_raised do
-      self.dbh = init_database
+  def test_transaction
+    self.dbh = new_database
+    assert dbh
+
+    assert(! dbh.in_transaction?)
+
+    # Commit ends transaction
+    dbh.transaction do
+      assert(dbh.in_transaction?)
+      dbh.commit
+      assert(! dbh.in_transaction?, "#commit ends transaction")
+    end
+
+    # Rollback ends transaction
+    assert(! dbh.in_transaction?)
+    dbh.transaction do
+      assert(dbh.in_transaction?)
+      dbh.rollback
+      assert(! dbh.in_transaction?, "#rollback ends transaction")
+    end
+  end
+
+  def test_execute
+    self.dbh = new_database
+
+    assert_nothing_raised('Parameter-less bind throws no exceptions') do
+      dbh.execute('SELECT 1 FROM RDB$DATABASE WHERE 1=0').finish
+    end
+
+    assert_nothing_raised('Parameter bind throws no exceptions') do
+      dbh.execute('SELECT 1 FROM RDB$DATABASE WHERE 1=?', 0).finish
     end
   end
 

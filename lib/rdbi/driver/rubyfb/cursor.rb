@@ -78,10 +78,15 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
   end
 
   def next_row
-    row = @handle.fetch.values rescue nil
-    if row
+    begin
+      row = @handle.fetch.values
       @index += 1
+    rescue ::Rubyfb::FireRubyException
+      raise
+    rescue
+      row = nil
     end
+
     row
   end
 

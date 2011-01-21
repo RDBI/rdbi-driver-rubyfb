@@ -1,5 +1,4 @@
 require 'rdbi/driver/rubyfb'
-require 'epoxy'
 require 'rubyfb'
 
 class RDBI::Driver::Rubyfb::Database < RDBI::Database

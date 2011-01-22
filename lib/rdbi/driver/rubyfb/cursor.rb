@@ -14,9 +14,9 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
     @affected_count = handle.kind_of?(Numeric) ? handle : 0
   end
 
-  # Override RDBI::Cursor's default reliance on last_row?
-  # Since we don't know result set size in advance, we don't set
-  # last_row? until we move past the end of the result set...
+  # Base class relies on last_row?(), but we don't know result set
+  # size in advance and so don't set last_row?() until we attempt to
+  # move past the end...
   def each
     while row = next_row
       yield row
@@ -56,7 +56,7 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
   end
 
   def finish
-    @handle.close
+    @handle.close rescue nil
   end
 
   def first
@@ -81,10 +81,10 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
     begin
       row = @handle.fetch.values
       @index += 1
-    rescue ::Rubyfb::FireRubyException
-      raise
-    rescue
-      row = nil
+    rescue NoMethodError
+      # Either @handle wasn't a Rubyfb::ResultSet (as from a DML query), or
+      # fetch() was exhausted?() and returned nil.
+      class << self; def next_row; nil end end
     end
 
     row
@@ -103,5 +103,4 @@ class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
     #       permit result.as(:Foo) on non-rewindables?
     raise RDBI::Cursor::NotRewindableError.new('#rewind() called on non-rewindable cursor')
   end
-
 end # -- Cursor

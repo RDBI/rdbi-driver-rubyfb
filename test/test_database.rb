@@ -70,17 +70,8 @@ class TestDatabase < Test::Unit::TestCase
     end
   end
 
-  def FIXME_test_04_execute
-    self.dbh = init_database
-    dbh.transaction do
-      dbh.execute('select current_timestamp, rubyfb_test.* from RUBYFB_TEST').each do |row|
-      end
-      dbh.execute('select 0.0005 AS foop, 3.1415 AS barp, current_timestamp, rubyfb_test.* from RUBYFB_TEST').fetch(:all)
-    end
-  end
-
-  def test_05_rest
-    # XXX move me elsewhere
+  def test_rest
+    # XXX move me to result test
     self.dbh = init_database
     remainder = nil
     dbh.transaction do

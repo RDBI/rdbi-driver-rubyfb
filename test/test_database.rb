@@ -17,6 +17,13 @@ class TestDatabase < Test::Unit::TestCase
     assert ! dbh.connected?
   end
 
+  def test_disconnect_unfinished_result
+    self.dbh = new_database
+    result = dbh.execute('SELECT 1 FROM RDB$DATABASE UNION ALL SELECT 2 FROM RDB$DATABASE')
+    result.fetch
+    dbh.disconnect
+  end
+
   def test_ping
     self.dbh = new_database
     my_role = role.dup

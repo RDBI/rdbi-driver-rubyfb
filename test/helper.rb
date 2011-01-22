@@ -24,8 +24,17 @@ class Test::Unit::TestCase
 
   def init_database
     dbh = new_database
-    SQL_PRE.each { |sql| dbh.execute(sql) rescue nil }
-    SQL.each { |sql| dbh.execute(sql) }
+    dbh.transaction do |dbh|
+      dbh.execute('DROP TABLE RUBYFB_TEST') rescue nil
+      dbh.execute('CREATE TABLE RUBYFB_TEST (I INT PRIMARY KEY, VC VARCHAR(32))');
+    end
+    dbh.transaction do |dbh|
+      dbh.prepare('INSERT INTO RUBYFB_TEST (I, VC) VALUES (?, ?)') do |stmt|
+        %w(first second third fourth fifth).each_with_index do |vc, i|
+          stmt.execute(i+1, vc)
+        end
+      end
+    end
     dbh
   end
 

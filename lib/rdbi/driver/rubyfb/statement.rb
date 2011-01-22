@@ -1,32 +1,27 @@
 require 'rdbi/driver/rubyfb'
 require 'rubyfb'
+require 'epoxy'
 
 class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
   # FIXME - our autocommit attempt it totally bogus, is it?
   def initialize(query, dbh)
     super(query, dbh)
 
-    # If we were _not_ created inside a #transaction(&block), we need
-    # to fake an auto-commit mode
-    if dbh.fb_txns.empty?
-      @fake_autocommit = true
-      txn = Rubyfb::Transaction.new(dbh.fb_cxn)
-    else
-      @fake_autocommit = false
-      txn = dbh.fb_txns[-1]
-    end
     @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
-                                     txn,
+                                     dbh.fb_txns[-1],
                                      query,
                                      dbh.fb_dialect)
 
     @index_map = Epoxy.new(query).indexed_binds
     # @input_type_map initialized in superclass
     @output_type_map = RDBI::Type.create_type_hash(RDBI::Type::Out)
+    #puts "Statement.new #{self}"
+  end
 
-    prep_finalizer {
-      @fb_stmt.close rescue nil
-    }
+  def finish
+    #puts "finishing #{@fb_stmt}"
+    @fb_stmt.close
+    super
   end
 
   def new_modification(*binds)
@@ -42,20 +37,17 @@ class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
       end
     end
 
-    if fake_autocommit? and !@fb_stmt.transaction.active?
+    unless @fb_stmt.transaction.active?
       # We've been called and committed/rollbacked before
+      # XXX - do we really have to re-prepare for a new TXN?
       @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
                                        Rubyfb::Transaction.new(dbh.fb_cxn),
                                        query,
                                        dbh.fb_dialect)
     end
 
-    #puts "===> #{query}"
-    result = if fake_autocommit?
-               exec_autocommit(binds)
-             else
-               exec(binds)
-             end
+    #puts "Statement#execute(#{dbh.fb_cxn}, #{@fb_stmt.transaction}, \"#{query}\")"
+    result = binds.length > 0 ? @fb_stmt.execute_for(binds) : @fb_stmt.execute
 
     num_columns = result.column_count rescue 0
     columns = (0...num_columns).collect do |i|
@@ -69,35 +61,8 @@ class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
                           #puts c
                           #c
     end
-    [ RDBI::Driver::Rubyfb::Cursor.new(result), RDBI::Schema.new(columns), @output_type_map ]
+    cursor = RDBI::Driver::Rubyfb::Cursor.new(result)
+    [ cursor, RDBI::Schema.new(columns), @output_type_map ]
   end #-- new_execution
 
-  protected
-  def fake_autocommit?
-    @fake_autocommit
-  end
-
-  def exec(parameters)
-    if parameters.length > 0
-      @fb_stmt.execute_for(parameters)
-    else
-      @fb_stmt.execute
-    end
-  end
-
-  def exec_autocommit(parameters)
-    if !@fb_stmt.transaction.active?
-      # Re-prepare for anonymous transaction
-      @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
-                                       Rubyfb::Transaction.new(dbh.fb_cxn),
-                                       query,
-                                       dbh.fb_dialect)
-    end
-    result = exec(parameters)
-    @fb_stmt.transaction.commit
-    result
-  rescue Rubyfb::FireRubyException => e
-    @fb_stmt.transaction.rollback rescue nil
-    raise e
-  end
 end #-- class Statement

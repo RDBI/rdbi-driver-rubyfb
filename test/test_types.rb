@@ -7,13 +7,12 @@ class TestTypes < Test::Unit::TestCase
 
   # TODO:
   #   - BLOB test (different API)
-  #   - FLOAT test (13.37 != 13.369999885559082)
   #   - implicit types test (because some floating precision is stored as
   #                          BIGINT -- make sure we're getting this right)
   #
   #    fb_type        => [ literal, expected ]
   # -----------------    ------------------------------------------------
-  #    "CAST(#{LITERAL} AS FB SQL TYPE)"
+  #    "CAST(#{LITERAL} AS FB TYPE)"
   {
     :double_precision => [ '1.001', 1.001 ],
     :date             => [ "'2010-01-01'", ::Date.parse('2010-01-01') ],
@@ -27,7 +26,7 @@ class TestTypes < Test::Unit::TestCase
     :"varchar(3)"     => [ "'foo'", 'foo' ],
   }.each do |fb_type, t|
 
-    method_name = ('test_explicit_' + fb_type.to_s.gsub(/\(\d+(,\d+)\)?/, '')).to_sym
+    method_name = ('test_explicit_' + fb_type.to_s.gsub(/\(\d+(,\d+)?\)/, '')).to_sym
     literal, expected = t
     sql_type = fb_type.to_s.gsub(/_/, ' ').upcase
 
@@ -36,6 +35,13 @@ class TestTypes < Test::Unit::TestCase
       value = select_one_literal(cast)
       assert_hard_equivalence(expected, value, cast)
     end
+  end
+
+  def test_explicit_float
+    cast = 'CAST(1.23 AS FLOAT)'
+    val  = select_one_literal(cast)
+    assert_kind_of(::Float, val, cast)
+    assert( (val - 1.23).abs < 0.05, "#{cast} was not even close to 1.23")
   end
 
   def setup
@@ -55,8 +61,8 @@ class TestTypes < Test::Unit::TestCase
 
   def select_one_literal(literal)
     ret = nil
-    dbh.transaction do |txn|
-      txn.execute("SELECT #{literal} FROM RDB$DATABASE") do |result|
+    dbh.transaction do
+      dbh.execute("SELECT #{literal} FROM RDB$DATABASE") do |result|
         ret = result.fetch[0][0]
       end
     end

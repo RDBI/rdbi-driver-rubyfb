@@ -25,9 +25,13 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
   end
 
   def disconnect
-    # XXX - fails with outstanding txn
-    @fb_cxn.close unless @fb_cxn.closed?
+    # First, let RDBI take care of bookkeeping, which
+    # includes explicitly #finish()ing any child sths.
     super
+    # Now close the open connection.  If we reversed
+    # the order, orphaned child statements would throw
+    # errors upon #finish().
+    @fb_cxn.close unless @fb_cxn.closed?
   end
 
   def transaction(&block)

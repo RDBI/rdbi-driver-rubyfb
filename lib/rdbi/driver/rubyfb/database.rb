@@ -18,8 +18,8 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
 
     user = @connect_args[:user] || @connect_args[:username] || ENV['ISC_USER']
     pass = @connect_args[:password] || @connect_args[:auth] || ENV['ISC_PASSWORD']
-    @fb_cxn = @fb_db.connect(user, pass)
-    @fb_txns = []
+    @fb_cxn  = @fb_db.connect(user, pass)
+    @fb_txns = [Rubyfb::Transaction.new(@fb_cxn)]
   rescue Rubyfb::FireRubyException => e
     raise RDBI::Error.new(e.message)
   end
@@ -38,12 +38,14 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
   def commit
     # FIXME - in_trans? check
     @fb_txns.pop.commit
+    @fb_txns << Rubyfb::Transaction.new(@fb_cxn) if @fb_txns.empty?
     super
   end
 
   def rollback
     # FIXME - in_trans? check
     @fb_txns.pop.rollback
+    @fb_txns << Rubyfb::Transaction.new(@fb_cxn) if @fb_txns.empty?
     super
   end
 
@@ -67,4 +69,5 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
 
   # def table_schema
   # def schema
+
 end # -- class Database

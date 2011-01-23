@@ -16,7 +16,8 @@ class TestTypes < Test::Unit::TestCase
   {
     :double_precision => [ '1.001', 1.001 ],
     :date             => [ "'2010-01-01'", ::Date.parse('2010-01-01') ],
-    :timestamp        => [ "'2010-01-01 01:02:03'", ::DateTime.parse('2010-01-01 01:02:03') ],
+    :timestamp        => [ "'2010-01-01 01:02:03'",
+           ::DateTime.parse("2010-01-01 01:02:03 #{::DateTime.now.zone}") ],
     :integer          => [ '128', 128 ],
     :smallint         => [ '1', 1 ],
     :bigint           => [ '-2', -2 ],

@@ -1,5 +1,7 @@
 require 'rdbi/driver/rubyfb'
+require 'typelib'
 require 'rubyfb'
+require 'date'
 require 'epoxy'
 
 class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
@@ -14,7 +16,15 @@ class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
 
     @index_map = Epoxy.new(query).indexed_binds
     # @input_type_map initialized in superclass
+
+    # Hmm.  Why not initialize this in the parent dbh?
     @output_type_map = RDBI::Type.create_type_hash(RDBI::Type::Out)
+    zone = ::DateTime.now.zone
+    @output_type_map[:timestamp] =
+      [TypeLib::Filter.new(
+                          proc { |x| x.kind_of?(::Time) },
+                          proc { |x| ::DateTime.parse(x.to_s + " #{zone}") }
+                         )]
     #puts "Statement.new #{self}"
   end
 
@@ -51,10 +61,20 @@ class RDBI::Driver::Rubyfb::Statement < RDBI::Statement
 
     num_columns = result.column_count rescue 0
     columns = (0...num_columns).collect do |i|
+      base_type = result.get_base_type(i).to_s.downcase.to_sym
+      ruby_type = case base_type
+                  when :bigint, :integer, :smallint
+                    scale = result.column_scale(i) rescue 0
+                    # XXX Need rubyfb > 0.5.5 to expose scale, otherwise
+                    #     cannot determine floats stored as BIGINTs.
+                    scale != 0 ? :float : base_type
+                  else
+                    base_type
+                  end
       c = RDBI::Column.new(
                            result.column_alias(i),
-                           result.get_base_type(i),
-                           result.get_base_type(i), # XXX - some floats BIGINT in IB6
+                           base_type,
+                           ruby_type,
                            0,
                            0
                           )

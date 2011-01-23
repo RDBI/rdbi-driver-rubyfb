@@ -22,6 +22,20 @@ Should work under ruby 1.8.7, as well.
 
 == Quirks, Incompleteness and Brokenness
 
+* No AutoCommit at present
+  The driver is presently offers manual commit mode
+
+* No BOOLEAN types
+  Firebird/InterBase do not offer a native boolean, so neither do we.
+  FIXME:  Support easy type map manipulation for user-defined boolean
+          DOMAINs.
+
+* TIMESTAMPs are understood in local time, with no means of overriding
+  at present.
+
+* DDL statements must be committed.
+  Firebird/InterBase behavior.
+
 * Result cursors are forward-iterable only, are not rewindable!
 * Faked auto-commit is terribly gross, might be removed
 * Certain implicit floating types may not be correctly represented as

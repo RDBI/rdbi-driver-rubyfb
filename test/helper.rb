@@ -41,4 +41,19 @@ class Test::Unit::TestCase
   def role
     RDBI::DBRC.roles[DBRC_SECTION]
   end
+
+  def assert_hard_equivalence(expected, actual, message = nil)
+    assert_kind_of(expected.class, actual, message)
+    assert_equal(expected, actual, message)
+  end
+
+  def select_one_literal(dbh, literal)
+    ret = nil
+    dbh.transaction do
+      dbh.execute("SELECT #{literal} FROM RDB$DATABASE") do |result|
+        ret = result.fetch[0][0]
+      end
+    end
+    ret
+  end
 end # -- Test::Unit::TestCase

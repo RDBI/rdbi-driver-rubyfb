@@ -2,13 +2,11 @@ require 'helper'
 
 require 'date'
 
-class TestTypes < Test::Unit::TestCase
+class TestExplicitTypes < Test::Unit::TestCase
   attr_accessor :dbh
 
   # TODO:
   #   - BLOB test (different API)
-  #   - implicit types test (because some floating precision is stored as
-  #                          BIGINT -- make sure we're getting this right)
   #
   #    fb_type        => [ literal, expected ]
   # -----------------    ------------------------------------------------
@@ -33,14 +31,14 @@ class TestTypes < Test::Unit::TestCase
 
     define_method method_name do
       cast  = "CAST(#{literal} AS #{sql_type})"
-      value = select_one_literal(cast)
+      value = select_one_literal(dbh, cast)
       assert_hard_equivalence(expected, value, cast)
     end
   end
 
   def test_explicit_float
     cast = 'CAST(1.23 AS FLOAT)'
-    val  = select_one_literal(cast)
+    val  = select_one_literal(dbh, cast)
     assert_kind_of(::Float, val, cast)
     assert( (val - 1.23).abs < 0.05, "#{cast} was not even close to 1.23")
   end
@@ -53,20 +51,4 @@ class TestTypes < Test::Unit::TestCase
     @dbh.disconnect if @dbh && @dbh.connected?
   end
 
-  private
-
-  def assert_hard_equivalence(expected, actual, message = nil)
-    assert_kind_of(expected.class, actual, message)
-    assert_equal(expected, actual, message)
-  end
-
-  def select_one_literal(literal)
-    ret = nil
-    dbh.transaction do
-      dbh.execute("SELECT #{literal} FROM RDB$DATABASE") do |result|
-        ret = result.fetch[0][0]
-      end
-    end
-    ret
-  end
 end

@@ -10,3 +10,4 @@ end
 require 'rdbi/driver/rubyfb/database'
 require 'rdbi/driver/rubyfb/statement'
 require 'rdbi/driver/rubyfb/cursor'
+require 'rdbi/driver/rubyfb/types'

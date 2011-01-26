@@ -6,7 +6,13 @@ require 'epoxy'
 
 class RDBI::Driver::Rubyfb
 class Statement < RDBI::Statement
-  # FIXME - our autocommit attempt it totally bogus, is it?
+  RTRIM_RE   = ::Regexp.new(/ +\z/)
+  TIME_ZONE  = ::DateTime.now.zone # TODO - allow changing TZ
+  STR_RTRIM  = proc { |str| str.sub(RTRIM_RE, '') }
+  IS_STR     = proc { |x| x.kind_of?(::String) }
+  IS_TIME    = proc { |x| x.kind_of?(::Time) }
+  TIME_TO_DT = proc { |t| ::DateTime.parse(t.to_s + ' ' + TIME_ZONE) }
+
   def initialize(query, dbh)
     super(query, dbh)
 
@@ -21,12 +27,12 @@ class Statement < RDBI::Statement
     # Rubyfb returns TIMESTAMPs as Time objects, so we convert
     # (Hmm.  Why not initialize this in the parent dbh?)
     @output_type_map = RDBI::Type.create_type_hash(RDBI::Type::Out)
-    zone = ::DateTime.now.zone
-    @output_type_map[:timestamp] =
-      [TypeLib::Filter.new(
-                          proc { |x| x.kind_of?(::Time) },
-                          proc { |x| ::DateTime.parse(x.to_s + " #{zone}") }
-                         )]
+    @output_type_map[:timestamp] = [TypeLib::Filter.new(IS_TIME, TIME_TO_DT)]
+
+    # ChopBlanks support.  CAST('a' AS CHAR(5)) -> 'a', not 'a    '
+    rtrim_filter = TypeLib::Filter.new(IS_STR, STR_RTRIM)
+    @output_type_map[:char]    = [rtrim_filter]
+    @output_type_map[:varchar] = [rtrim_filter]
     #puts "Statement.new #{self}"
   end
 

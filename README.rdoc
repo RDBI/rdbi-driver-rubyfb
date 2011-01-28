@@ -18,7 +18,8 @@ https://github.com/pilcrow/rdbi-driver-rubyfb
 
 ruby 1.9.2, Firebird 2.1.3, RDBI 0.9.1 and rubyfb 0.5.5.
 
-Should work under ruby 1.8.7, as well.
+Should work under ruby 1.8.7, as well.  Firebird >= 1.5 needed (for CASE
+support under the hood).
 
 == Quirks, Incompleteness and Brokenness
 
@@ -33,17 +34,18 @@ Should work under ruby 1.8.7, as well.
 * TIMESTAMPs are understood in local time, with no means of overriding
   at present.
 
+* Trailing blanks are trimmed from string (CHAR and VARCHAR) values.
+  Firebird adheres to strict SQL, in which 'foo   ' = 'foo'.
+
 * DDL statements must be committed.
   Firebird/InterBase behavior.
 
+* table_schema does not support 'default' yet
 * Result cursors are forward-iterable only, are not rewindable!
 * Faked auto-commit is terribly gross, might be removed
 * Certain implicit floating types may not be correctly represented as
   Column objects.
   They should fetch just fine, however.  (Limitation of rubyfb-0.5.5?)
-* Just like Firebird, we don't support SQL booleans
-  You'll need to install your own true/false converter to match your
-  application's expectations.
 * Test suite very minimal
 * No gem yet
 * Many more!

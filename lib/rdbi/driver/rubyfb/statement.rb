@@ -28,11 +28,8 @@ class Statement < RDBI::Statement
     # (Hmm.  Why not initialize this in the parent dbh?)
     @output_type_map = RDBI::Type.create_type_hash(RDBI::Type::Out)
     @output_type_map[:timestamp] = [TypeLib::Filter.new(IS_TIME, TIME_TO_DT)]
-
     # ChopBlanks support.  CAST('a' AS CHAR(5)) -> 'a', not 'a    '
-    rtrim_filter = TypeLib::Filter.new(IS_STR, STR_RTRIM)
-    @output_type_map[:char]    = [rtrim_filter]
-    @output_type_map[:varchar] = [rtrim_filter]
+    @output_type_map[:char]      = [TypeLib::Filter.new(IS_STR, STR_RTRIM)]
     #puts "Statement.new #{self}"
   end
 

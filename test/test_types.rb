@@ -55,6 +55,7 @@ class TestTypes < Test::Unit::TestCase
   simple_type_test :rtrim_multiline,       "'foo\nbar  '", "foo\nbar"
   simple_type_test :rtrim,                  "'   foo   '", '   foo'
   simple_type_test :rtrim_cast, "CAST('foo' AS CHAR(31))", 'foo'
+  simple_type_test :no_rtrim_varchar, "CAST('foo ' AS VARCHAR(4))", 'foo '
 
   def setup
     @dbh = new_database

@@ -76,20 +76,4 @@ class TestDatabase < Test::Unit::TestCase
       dbh.execute('SELECT 1 FROM RDB$DATABASE WHERE 1=?', 0).finish
     end
   end
-
-  def test_rest
-    # XXX move me to result test
-    self.dbh = init_database
-    remainder = nil
-    dbh.transaction do
-      dbh.execute('select I, VC from RUBYFB_TEST') do |res|
-        assert_nothing_raised { res.fetch }
-        assert_nothing_raised { res.fetch }
-        remainder = res.fetch(:rest)
-        assert_equal([], res.fetch)
-        assert_equal([], res.fetch(5))
-      end
-    end
-    assert_equal([[3, 'third'], [4, 'fourth'], [5, 'fifth']], remainder)
-  end
 end

@@ -6,12 +6,34 @@ require 'epoxy'
 
 class RDBI::Driver::Rubyfb
 class Statement < RDBI::Statement
+  # :nodoc:
+  # Type conversions we perform:
+  #
+  #   Firebird    Rubyfb     RDBI    Notes
+  #   ---------  --------  --------  -------------------------------------
+  #   TIMESTAMP      Time  DateTime
+  #   TIMESTAMP  DateTime  DateTime  (if out of range of Time)
+  #        CHAR     'a   '      'a'
+  #
   RTRIM_RE   = ::Regexp.new(/ +\z/)
   TIME_ZONE  = ::DateTime.now.zone # TODO - allow changing TZ
   STR_RTRIM  = proc { |str| str.sub(RTRIM_RE, '') }
   IS_STR     = proc { |x| x.kind_of?(::String) }
   IS_TIME    = proc { |x| x.kind_of?(::Time) }
-  TIME_TO_DT = proc { |t| ::DateTime.parse(t.to_s + ' ' + TIME_ZONE) }
+  TIME_TO_DT = proc { |t|
+                 ::DateTime.new(t.year,
+                                t.month,
+                                t.day,
+                                t.hour,
+                                t.min,
+                                t.sec + Rational(t.usec, 10**6),
+                                Rational(t.utc_offset, 60 * 60 * 24))
+               }
+
+  OUTPUT_MAP = RDBI::Type.create_type_hash(RDBI::Type::Out).merge({
+                 :timestamp => [TypeLib::Filter.new(IS_TIME, TIME_TO_DT)],
+                 :char      => [TypeLib::Filter.new(IS_STR, STR_RTRIM)]
+               })
 
   def initialize(query, dbh)
     super(query, dbh)
@@ -22,15 +44,6 @@ class Statement < RDBI::Statement
                                      dbh.fb_dialect)
 
     @index_map = Epoxy.new(query).indexed_binds
-    # @input_type_map initialized in superclass
-
-    # Rubyfb returns TIMESTAMPs as Time objects, so we convert
-    # (Hmm.  Why not initialize this in the parent dbh?)
-    @output_type_map = RDBI::Type.create_type_hash(RDBI::Type::Out)
-    @output_type_map[:timestamp] = [TypeLib::Filter.new(IS_TIME, TIME_TO_DT)]
-    # ChopBlanks support.  CAST('a' AS CHAR(5)) -> 'a', not 'a    '
-    @output_type_map[:char]      = [TypeLib::Filter.new(IS_STR, STR_RTRIM)]
-    #puts "Statement.new #{self}"
   end
 
   def finish
@@ -80,7 +93,7 @@ class Statement < RDBI::Statement
                           #c
     end
     cursor_klass = self.rewindable_result ? ArrayCursor : ForwardOnlyCursor
-    [ cursor_klass.new(result), RDBI::Schema.new(columns), @output_type_map ]
+    [ cursor_klass.new(result), RDBI::Schema.new(columns), OUTPUT_MAP ]
   end #-- new_execution
 
 end #-- class Statement

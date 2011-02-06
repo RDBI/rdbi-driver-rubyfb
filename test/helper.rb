@@ -8,6 +8,14 @@ require 'rdbi/driver/rubyfb'
 class Test::Unit::TestCase
   DBRC_SECTION = :rubyfb_test         # Change as needed
 
+  TEST_ROWS = [
+    [1, 'first'],
+    [2, 'second'],
+    [3, 'third'],
+    [4, 'fourth'],
+    [5, 'fifth'],
+  ]
+
   SQL_PRE = ['DROP TABLE RUBYFB_TEST']
   SQL = [
     'CREATE TABLE RUBYFB_TEST (I INT PRIMARY KEY, VC VARCHAR(32))',

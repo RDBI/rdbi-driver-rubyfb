@@ -1,106 +1,166 @@
 require 'rdbi'
 require 'rubyfb'
 
-class RDBI::Driver::Rubyfb::Cursor < RDBI::Cursor
-  # Base class assumes "size" of result set known in advance of fetching
+class RDBI::Driver::Rubyfb
 
-  attr_reader :affected_count
-
-  def initialize(handle)
-    super(handle)
-    @index = 0 # FIXME - move to superclass
-
-    # XXX - what is spec here?  Zero or nil for not-applicable counts?
-    @affected_count = handle.kind_of?(Numeric) ? handle : 0
-  end
-
-  # Base class relies on last_row?(), but we don't know result set
-  # size in advance and so don't set last_row?() until we attempt to
-  # move past the end...
-  def each
-    while row = next_row
-      yield row
+  ##
+  # Parent class for Driver::Rubyfb cursors, responsible for
+  # affected_count, @index and (via RDBI::Cursor) handle.
+  #
+  class BaseCursor < RDBI::Cursor
+    def affected_count
+      @affected_count ||= (handle.kind_of?(Numeric) ? handle : 0)
     end
-  end
+  end # -- BaseCursor
 
-  def [](i)
-    if i < @index
-      raise RDBI::Cursor::NotRewindableError.new('requested index requires rewindable cursor')
+  ##
+  # Simple rewindable cursor, reading all results into memory and closing
+  # the underlying handle.
+  #
+  class ArrayCursor < BaseCursor
+    def initialize(rfb_handle)
+      super(rfb_handle)
+      @index = 0
+      @rows  = if rfb_handle.kind_of?(::Rubyfb::ResultSet)
+                 rfb_handle.collect { |row| row.values }
+               else
+                 []
+               end
     end
-    (0...(i-1)).each do next_row end
-    next_row
-  end
 
-  # def affected_count ... end  (attr_reader)
-
-  def all
-    if @index > 0
-      raise RDBI::Cursor::NotRewindableError.new('#all() requested on non-rewindable cursor after cursor advance')
+    def [](i)
+      @rows[i]
     end
-    rest
-  end
 
-  def empty?
-    # XXX - API - move to common implementation
-    #       Is this reliable on DML statements?
-    result_count == 0 and last_row?
-  end
-
-  def fetch(count = 1)
-    ret = []
-    (0...count).each do
-      break unless row = next_row
-      ret << row
+    def all
+      @rows
     end
-    ret
-  end
 
-  def finish
-    @handle.close rescue nil
-  end
-
-  def first
-    return next_row if @index == 0
-    # FIXME - provide mixin which tracks rewindability, throws errors
-    raise RDBI::Cursor::NotRewindableError.new('#first() called after a fetch on a non-rewindable cursor')
-  end
-
-  def last
-    ret = nil
-    while row = next_row
-      ret = row
+    def empty?
+      @rows.size == 0
     end
-    ret
-  end
 
-  def last_row?
-    @handle.exhausted?
-  end
+    def finish; end
 
-  def next_row
-    begin
-      row = @handle.fetch.values
+    def first
+      @rows.first
+    end
+
+    def last
+      @rows.last
+    end
+
+    def last_row?
+      @index == @rows.size
+    end
+
+    def result_count
+      @rows.size
+    end
+
+    ### @index-based row access ###
+    def fetch(count = 1)
+      if r = @rows[@index, count]
+        @index += [count, r.size].min
+      end
+      r
+    end
+
+    def next_row
+      return if last_row?
+      val = @rows[@index]
       @index += 1
-    rescue NoMethodError
-      # Either @handle wasn't a Rubyfb::ResultSet (as from a DML query), or
-      # fetch() was exhausted?() and returned nil.
-      class << self; def next_row; nil end end
+      val
     end
 
-    row
-  end
+    def rewind
+      @index = 0
+    end
 
-  def rest
-    self.collect {|row| row}
-  end
+    def rest
+      @rows[@index..-1]
+    end
+  end # -- class ArrayCursor
 
-  def result_count
-    @handle.row_count rescue 0 # FIXME - API - just rows fetched so far!  SPEC clarify
-  end
+  ##
+  # Non-rewindable cursor class which does not load all rows into memory.
+  class ForwardOnlyCursor < BaseCursor
+    # :nodoc:
+    # RDBI::Cursor#each relies on last_row?(), but Rubyfb::Cursor does
+    # not know its result set size in advance, and does not know that it
+    # is #exhausted? until we attempt to move past the end...
+    def each
+      while row = next_row
+        yield row
+      end
+    end
 
-  def rewind
-    return if @index == 0 # FIXME - API - Ugh.  What should we do here to
-    #       permit result.as(:Foo) on non-rewindables?
-    raise RDBI::Cursor::NotRewindableError.new('#rewind() called on non-rewindable cursor')
-  end
-end # -- Cursor
+    def [](i)
+      if i < result_count
+        raise RDBI::Cursor::NotRewindableError.new('requested index requires rewindable cursor')
+      end
+      (0...(i-1)).each do next_row end
+      next_row
+    end
+
+    def all
+      return @handle.collect {|r| r.values} if 0 == @handle.row_count
+      raise RDBI::Cursor::NotRewindableError.new(':all requested on non-rewindable cursor after advance')
+    end
+
+    def rest
+      self.collect { |r| r }
+    end
+
+    def empty?
+      0 == result_count and last_row?
+    end
+
+    def fetch(count = 1)
+      ret = []
+      (0...count).each do
+        break unless row = next_row
+        ret << row
+      end
+      ret
+    end
+
+    def finish
+      @handle.close rescue nil
+    end
+
+    def first
+      return next_row if 0 == result_count
+      # FIXME - provide mixin which tracks rewindability, throws errors
+      raise RDBI::Cursor::NotRewindableError.new(':first requested after advancing non-rewindable cursor')
+    end
+
+    def last
+      ret = nil
+      while row = next_row
+        ret = row
+      end
+      return ret if ret
+      raise RDBI::Cursor::NotRewindableError.new(':last requested after advancing past end of non-rewindable cursor')
+    end
+
+    def last_row?
+      @handle.exhausted? rescue true
+    end
+
+    def next_row
+      @handle.fetch.values rescue nil
+    end
+
+    def result_count
+      @handle.row_count rescue 0
+    end
+
+    def rewind
+      # Yuck - special case ignore rewind at index 0, since  #as(:Blah)
+      # forces a #rewind()
+      return if 0 == result_count
+      raise RDBI::Cursor::NotRewindableError.new('#rewind() requested on non-rewindable cursor')
+    end
+  end # -- Cursor
+end # -- class RDBI::Driver::Rubyfb

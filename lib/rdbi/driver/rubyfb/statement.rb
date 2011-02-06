@@ -79,7 +79,8 @@ class Statement < RDBI::Statement
                           #puts c
                           #c
     end
-    [ Cursor.new(result), RDBI::Schema.new(columns), @output_type_map ]
+    cursor_klass = self.rewindable_result ? ArrayCursor : ForwardOnlyCursor
+    [ cursor_klass.new(result), RDBI::Schema.new(columns), @output_type_map ]
   end #-- new_execution
 
 end #-- class Statement

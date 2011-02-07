@@ -4,9 +4,12 @@ require 'rubyfb'
 require 'date'
 require 'epoxy'
 
+#--
+# TODO:  Allow changing time zone
+#++
+
 class RDBI::Driver::Rubyfb
 class Statement < RDBI::Statement
-  # :nodoc:
   # Type conversions we perform:
   #
   #   Firebird    Rubyfb     RDBI    Notes
@@ -15,12 +18,12 @@ class Statement < RDBI::Statement
   #   TIMESTAMP  DateTime  DateTime  (if out of range of Time)
   #        CHAR     'a   '      'a'
   #
-  RTRIM_RE   = ::Regexp.new(/ +\z/)
-  TIME_ZONE  = ::DateTime.now.zone # TODO - allow changing TZ
-  STR_RTRIM  = proc { |str| str.sub(RTRIM_RE, '') }
-  IS_STR     = proc { |x| x.kind_of?(::String) }
-  IS_TIME    = proc { |x| x.kind_of?(::Time) }
-  TIME_TO_DT = proc { |t|
+  RTRIM_RE   = ::Regexp.new(/ +\z/)                 # :nodoc:
+  TIME_ZONE  = ::DateTime.now.zone                  # :nodoc:
+  STR_RTRIM  = proc { |str| str.sub(RTRIM_RE, '') } # :nodoc:
+  IS_STR     = proc { |x| x.kind_of?(::String) }    # :nodoc:
+  IS_TIME    = proc { |x| x.kind_of?(::Time) }      # :nodoc:
+  TIME_TO_DT = proc { |t|                           # :nodoc:
                  ::DateTime.new(t.year,
                                 t.month,
                                 t.day,
@@ -28,12 +31,12 @@ class Statement < RDBI::Statement
                                 t.min,
                                 t.sec + Rational(t.usec, 10**6),
                                 Rational(t.utc_offset, 60 * 60 * 24))
-               }
+               } # :nodoc:
 
-  OUTPUT_MAP = RDBI::Type.create_type_hash(RDBI::Type::Out).merge({
+  OUTPUT_MAP = RDBI::Type.create_type_hash(RDBI::Type::Out).merge({ # :nodoc:
                  :timestamp => [TypeLib::Filter.new(IS_TIME, TIME_TO_DT)],
                  :char      => [TypeLib::Filter.new(IS_STR, STR_RTRIM)]
-               })
+               }) # :nodoc:
 
   def initialize(query, dbh)
     super(query, dbh)

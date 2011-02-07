@@ -21,34 +21,62 @@ ruby 1.9.2, Firebird 2.1.3, RDBI 0.9.1 and rubyfb 0.5.5.
 Should work under ruby 1.8.7, as well.  Firebird >= 1.5 needed (for CASE
 support under the hood).
 
-== Quirks, Incompleteness and Brokenness
+== Driver Quirks, Incompleteness and Brokenness
 
-* No AutoCommit at present
-  The driver is presently offers manual commit mode
+=== Result Sets
+By default, +rewindable_result+ is false and query result sets are "forward
+only" iterables, such that any attempt to look behind the current fetch index
+is an error.
 
-* No BOOLEAN types
-  Firebird/InterBase do not offer a native boolean, so neither do we.
-  FIXME:  Support easy type map manipulation for user-defined boolean
-          DOMAINs.
+If +rewindable_result+ is true, +rdbi-driver-rubyfb+ provides fully rewindable
+(and, indeed, random access) cursors which have the side effect of reading
+the entire result set into memory.
 
-* TIMESTAMPs are understood in local time, with no means of overriding
-  at present.
+=== Transactions
+* "Manual commit" only
+  There is _no_ autocommit mode at present.  This may change in a future
+  release, but you should use explicit transactions anyway.
 
-* Trailing blanks are trimmed from string (CHAR and VARCHAR) values.
-  Firebird adheres to strict SQL, in which 'foo   ' = 'foo'.
+* Transactional DDL requires commit
+  Firebird supports transactional DDL like other industrial databases.
+  However, DDL statements must be committed before their effects are
+  visible to subsequent DML/query statements.
 
-* DDL statements must be committed.
-  Firebird/InterBase behavior.
+  For example, this won't work:
 
-* table_schema does not support 'default' yet
-* Result cursors are forward-iterable only, are not rewindable!
-* Faked auto-commit is terribly gross, might be removed
-* Certain implicit floating types may not be correctly represented as
-  Column objects.
-  They should fetch just fine, however.  (Limitation of rubyfb-0.5.5?)
-* Test suite very minimal
-* No gem yet
-* Many more!
+    dbh.transaction do
+      dbh.execute('create table TBL (I integer not null)')
+      dbh.execute('insert into TBL (I) values (?)', 1) # Error: "TBL" not yet
+                                                       # visible
+    end
+
+  Instead do this:
+
+    dbh.transaction do
+      dbh.execute('create table ...')
+      ... other DML ...
+    end
+    dbh.transaction do
+      dbh.execute('insert into ...')
+    end
+
+=== Types
+
+* Fixed-length CHAR fields are automatically right-trimmed.
+  Firebird and Interbase databases pad CHAR columns with spaces.  (In strict
+  SQL trailing spaces are ignored on string comparisons, so 'foo   ' = 'foo'.)
+
+* TIMESTAMPs are understood _in the local time zone_
+  There is currently no way to override this.
+
+* BOOLEANs perhaps not supported
+  Not all Firebird/Interbase databases offer a native BOOLEAN type, instead
+  using CHAR(1) or SMALLINT flags, or user-defined SQL DOMAINs.  Firebird
+  3.0 offers a BOOLEAN type.
+
+=== RDBI Compliance
+
+* +table_schema+ does not yet support +default+ column values
 
 == Running tests
 

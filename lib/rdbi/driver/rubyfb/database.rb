@@ -126,6 +126,9 @@ eosql
     info
   end
 
+  # Return a list of +RDBI::Schema+ objects for the current connection,
+  # excluding "system" objects, for example tables beginning with 'RDB$' or
+  # 'MON$'.
   def schema
     execute(<<-eosql).collect { |row| row[0] }.collect { |t| table_schema(t) }
 SELECT rdb$relation_name FROM rdb$relations WHERE rdb$system_flag != 1

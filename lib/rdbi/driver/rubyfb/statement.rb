@@ -41,12 +41,15 @@ class Statement < RDBI::Statement
   def initialize(query, dbh)
     super(query, dbh)
 
+    ep = Epoxy.new(query)
+    @index_map = ep.indexed_binds
+    oh_epoxy_could_simplify_this = @index_map.compact.inject({}) {|accum,i| accum.merge({i=>nil})}
+    @xlated_query = ep.quote(oh_epoxy_could_simplify_this) {|x| '?'}
+
     @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
                                      dbh.fb_txns[-1],
-                                     query,
+                                     @xlated_query,
                                      dbh.fb_dialect)
-
-    @index_map = Epoxy.new(query).indexed_binds
   end
 
   def finish
@@ -73,7 +76,7 @@ class Statement < RDBI::Statement
       # XXX - do we really have to re-prepare for a new TXN?
       @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
                                        Rubyfb::Transaction.new(dbh.fb_cxn),
-                                       query,
+                                       @xlated_query,
                                        dbh.fb_dialect)
     end
 

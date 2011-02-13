@@ -41,13 +41,27 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
 
   def commit
     # FIXME - in_trans? check
-    @fb_txns.pop.commit
+    txn = @fb_txns.pop
+    begin
+      txn.commit
+    rescue Rubyfb::FireRubyException
+      # E.g. failed DROP TABLE commit, b/c 'object is in use', still
+      # referenced by an active DML statement.
+      @fb_txns << txn
+      raise
+    end
     @fb_txns << Rubyfb::Transaction.new(@fb_cxn) if @fb_txns.empty?
     super
   end
 
   def rollback
     # FIXME - in_trans? check
+    txn = @fb_txns.pop
+    begin
+      txn.rollback
+    rescue Rubyfb::FireRubyException
+      @fb_txns << txn
+    end
     @fb_txns.pop.rollback
     @fb_txns << Rubyfb::Transaction.new(@fb_cxn) if @fb_txns.empty?
     super

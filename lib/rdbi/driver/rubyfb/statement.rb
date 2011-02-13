@@ -54,8 +54,8 @@ class Statement < RDBI::Statement
 
   def finish
     #puts "finishing #{@fb_stmt}"
-    @fb_stmt.close
     super
+    @fb_stmt.close
   end
 
   def new_modification(*binds)
@@ -74,6 +74,9 @@ class Statement < RDBI::Statement
     unless @fb_stmt.transaction.active?
       # We've been called and committed/rollbacked before
       # XXX - do we really have to re-prepare for a new TXN?
+      # XXX - this is incorrect, as this TXN cannot be committed/canceled
+      puts "... new txn ..."
+      @fb_stmt.close
       @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
                                        Rubyfb::Transaction.new(dbh.fb_cxn),
                                        @xlated_query,

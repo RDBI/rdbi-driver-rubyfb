@@ -123,6 +123,8 @@ class TestDatabase < Test::Unit::TestCase
   end
 
   def test_zero_results
+    self.dbh = init_database
+
     sth = dbh.prepare('insert into RUBYFB_TEST (I, VC) values (?, ?)')
     res = sth.execute(6, 'sesa')
     assert_equal(1, res.affected_count)

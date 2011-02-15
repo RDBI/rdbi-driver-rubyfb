@@ -59,32 +59,17 @@ class Statement < RDBI::Statement
   end
 
   def new_modification(*binds)
-    new_execution(*binds)
+    result = exec_query(binds)
+    return case result
+           when ::Numeric
+             result
+           else # Hmm, a query which did not affect rows was passed to
+             0  # #execute_modification() (either Database or Statement).
+           end
   end
 
   def new_execution(*binds)
-    hashes, binds = binds.partition { |x| x.kind_of?(Hash) }
-    hash = hashes.inject({}) { |x, y| x.merge(y) }
-    hash.keys.each do |key|
-      if index = @index_map.index(key)
-        binds.insert(index, hash[key])
-      end
-    end
-
-    unless @fb_stmt.transaction.active?
-      # We've been called and committed/rollbacked before
-      # XXX - do we really have to re-prepare for a new TXN?
-      # XXX - this is incorrect, as this TXN cannot be committed/canceled
-      puts "... new txn ..."
-      @fb_stmt.close
-      @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
-                                       Rubyfb::Transaction.new(dbh.fb_cxn),
-                                       @xlated_query,
-                                       dbh.fb_dialect)
-    end
-
-    #puts "Statement#execute(#{dbh.fb_cxn}, #{@fb_stmt.transaction}, \"#{query}\")"
-    result = binds.length > 0 ? @fb_stmt.execute_for(binds) : @fb_stmt.execute
+    result = exec_query(binds)
 
     num_columns = result.column_count rescue 0
     columns = (0...num_columns).collect do |i|
@@ -105,5 +90,31 @@ class Statement < RDBI::Statement
     [ cursor_klass.new(result), RDBI::Schema.new(columns), OUTPUT_MAP ]
   end #-- new_execution
 
+  private
+
+  # Parse parameters, open a new txn if needed, and return the Rubyfb query
+  # result
+  def exec_query(binds)
+    hashes, binds = binds.partition { |x| x.kind_of?(Hash) }
+    hash = hashes.inject({}) { |x, y| x.merge(y) }
+    hash.keys.each do |key|
+      if index = @index_map.index(key)
+        binds.insert(index, hash[key])
+      end
+    end
+
+    unless @fb_stmt.transaction.active?
+      # We've been called and committed/rollbacked before
+      # XXX - do we really have to re-prepare for a new TXN?
+      # XXX - this is incorrect, as this TXN cannot be committed/canceled
+      @fb_stmt.close
+      @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
+                                       Rubyfb::Transaction.new(dbh.fb_cxn),
+                                       @xlated_query,
+                                       dbh.fb_dialect)
+    end
+
+    return (binds.length > 0 ? @fb_stmt.execute_for(binds) : @fb_stmt.execute)
+  end
 end #-- class Statement
 end #-- class RDBI::Driver::Rubyfb

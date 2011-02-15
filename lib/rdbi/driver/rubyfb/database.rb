@@ -16,8 +16,8 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
     self.fb_db = Rubyfb::Database.new(self.database_name)
     @fb_dialect = 3
 
-    user = @connect_args[:user] || @connect_args[:username] || ENV['ISC_USER']
-    pass = @connect_args[:password] || @connect_args[:auth] || ENV['ISC_PASSWORD']
+    user = @connect_args[:user] || @connect_args[:username]
+    pass = @connect_args[:password] || @connect_args[:auth]
     @fb_cxn  = @fb_db.connect(user, pass)
     @fb_txns = [Rubyfb::Transaction.new(@fb_cxn)]
   rescue Rubyfb::FireRubyException => e

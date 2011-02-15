@@ -122,13 +122,20 @@ class TestDatabase < Test::Unit::TestCase
     end
   end
 
-  def test_zero_results
+  def test_execute_modification
     self.dbh = init_database
+    sql = 'insert into RUBYFB_TEST (I, VC) values (?, ?)'
 
-    sth = dbh.prepare('insert into RUBYFB_TEST (I, VC) values (?, ?)')
+    sth = dbh.prepare(sql)
     res = sth.execute(6, 'sesa')
     assert_equal(1, res.affected_count)
     sth.finish
     assert_equal(1, res.affected_count)
+
+    ct = dbh.execute_modification(sql, 7, 'sepa')
+    assert_equal(1, ct)
+
+    ct = dbh.execute_modification('delete from RUBYFB_TEST')
+    assert_equal(7, ct)
   end
 end

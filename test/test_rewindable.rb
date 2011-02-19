@@ -125,4 +125,10 @@ class TestRewindable < Test::Unit::TestCase
       assert_equal(1, res.result_count, "SELECT count(1) #result_count was incorrect")
     end
   end
+
+  def test_affected_count
+    dbh.execute(%q|delete from RUBYFB_TEST where VC like 'f%'|) do |res|
+      assert_equal(3, res.affected_count)
+    end
+  end
 end

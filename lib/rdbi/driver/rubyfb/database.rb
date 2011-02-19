@@ -2,19 +2,37 @@ require 'rdbi/driver/rubyfb'
 require 'rubyfb'
 
 class RDBI::Driver::Rubyfb::Database < RDBI::Database
-  attr_accessor :fb_db
-  attr_accessor :fb_cxn
-  attr_reader   :fb_dialect
-  attr_reader   :fb_txns
 
+  ##
+  #
+  #     RDBI.connect(:Rubyfb, :database => db,
+  #                           :user     => 'SYSDBA',
+  #                           :password => 'masterkey')
+  #
+  # Connect to the specified database using the specified +:user+ and
+  # +:password+ credentials, which credentials, if omitted, default to the
+  # environment variables $ISC_USER and $ISC_PASSWORD.
+  #
+  # +:database+ may be a local filename, influenced by $ISC_DATABASE, a
+  # Firebird alias or a remote connection string.  Remote connection strings
+  # specify a host optionally followed by a slash ('/') and port, a colon (':')
+  # and a database filename or alias.  If omitted, port defaults to 3050
+  # (gds_db) or whatever is specified as a default in the local Firebird
+  # system configuration.  For example:
+  #
+  # - <tt>localhost/3050:C:\path\to\database.fdb</tt>
+  # - <tt>localhost/gds_db:C:\path\to\database.fdb</tt>
+  # - <tt>localhost:C:\path\to\database.fdb</tt>
+  # - <tt>localhost:alias-for-database</tt>
+  #
   def initialize(*args)
-    # XXX is :dbname required?  is :auth an appropriate name?
-    # FIXME - create database, what options?
-    # FIXME - dialect
+    #--
+    # TODO:  allow create database
+    #++
     super(*args)
-    self.database_name = @connect_args[:isc_database] || @connect_args[:database] || @connect_args[:db]
-    self.fb_db = Rubyfb::Database.new(self.database_name)
-    @fb_dialect = 3
+    self.database_name = @connect_args[:database] || @connect_args[:db]
+    @fb_db             = Rubyfb::Database.new(self.database_name)
+    @fb_dialect        = @connect_args[:dialect] || 3
 
     user = @connect_args[:user] || @connect_args[:username]
     pass = @connect_args[:password] || @connect_args[:auth]
@@ -24,6 +42,7 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
     raise RDBI::Error.new(e.message)
   end
 
+  # Disconnect
   def disconnect
     # First, let RDBI take care of bookkeeping, which
     # includes explicitly #finish()ing any child sths.
@@ -34,6 +53,11 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
     @fb_cxn.close unless @fb_cxn.closed?
   end
 
+  ##
+  # Begin a new transaction.
+  #
+  # Firebird supports nested transactions, but this behavior is not portable
+  # across all drivers.
   def transaction(&block)
     @fb_txns << Rubyfb::Transaction.new(@fb_cxn)
     super &block
@@ -68,7 +92,7 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
   end
 
   def new_statement(query)
-    RDBI::Driver::Rubyfb::Statement.new(query, self)
+    RDBI::Driver::Rubyfb::Statement.new(query, self, @fb_cxn, @fb_txns[-1], @fb_dialect)
   end
 
   # Return the elapsed time taken to check the database connection, or
@@ -85,6 +109,10 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
     raise RDBI::DisconnectedError.new(e.message)
   end
 
+  # Return an RDBI::Schema object describing the table or view.
+  #
+  # +tbl+ is internally normalized to uppercase.  At present, the
+  # 'default' member of RDBI::Column is not supported.
   def table_schema(tbl)
     column_sql = <<-eosql
 SELECT    rf.rdb$field_name         AS "name",
@@ -140,8 +168,8 @@ eosql
     info
   end
 
-  # Return a list of +RDBI::Schema+ objects for the current connection,
-  # excluding "system" objects, for example tables beginning with 'RDB$' or
+  # Return a list of RDBI::Schema objects for the current connection,
+  # excluding system objects, for example tables beginning with 'RDB$' or
   # 'MON$'.
   def schema
     execute(<<-eosql).collect { |row| row[0] }.collect { |t| table_schema(t) }

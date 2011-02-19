@@ -38,7 +38,7 @@ class Statement < RDBI::Statement
                  :char      => [TypeLib::Filter.new(IS_STR, STR_RTRIM)]
                }) # :nodoc:
 
-  def initialize(query, dbh)
+  def initialize(query, dbh, cxn, txn, dialect)
     super(query, dbh)
 
     ep = Epoxy.new(query)
@@ -46,10 +46,10 @@ class Statement < RDBI::Statement
     oh_epoxy_could_simplify_this = @index_map.compact.inject({}) {|accum,i| accum.merge({i=>nil})}
     @xlated_query = ep.quote(oh_epoxy_could_simplify_this) {|x| '?'}
 
-    @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
-                                     dbh.fb_txns[-1],
+    @fb_stmt = Rubyfb::Statement.new(cxn,
+                                     txn,
                                      @xlated_query,
-                                     dbh.fb_dialect)
+                                     dialect)
   end
 
   def finish
@@ -107,11 +107,12 @@ class Statement < RDBI::Statement
       # We've been called and committed/rollbacked before
       # XXX - do we really have to re-prepare for a new TXN?
       # XXX - this is incorrect, as this TXN cannot be committed/canceled
+      cxn, dialect = @fb_stmt.connection, @fb_stmt.dialect
       @fb_stmt.close
-      @fb_stmt = Rubyfb::Statement.new(dbh.fb_cxn,
+      @fb_stmt = Rubyfb::Statement.new(cxn,
                                        Rubyfb::Transaction.new(dbh.fb_cxn),
                                        @xlated_query,
-                                       dbh.fb_dialect)
+                                       dialect)
     end
 
     return (binds.length > 0 ? @fb_stmt.execute_for(binds) : @fb_stmt.execute)

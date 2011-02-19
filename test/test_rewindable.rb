@@ -103,4 +103,26 @@ class TestRewindable < Test::Unit::TestCase
       end
     end
   end
+
+  def test_result_count
+    dbh.execute('select * from RUBYFB_TEST') do |res|
+      assert_equal(5, res.result_count, "Multi-row #result_count pre-fetch was incorrect")
+      (1..5).each do |i|
+        assert_nothing_raised { res.fetch }
+        assert_equal(5, res.result_count, "Multi-row #result_count after fetch no. #{i} incorrect")
+      end
+    end
+
+    dbh.execute('select * from RUBYFB_TEST where 1=0') do |res|
+      assert_equal(0, res.result_count, "Zero-row select #result_count pre-fetch was incorrect")
+      assert_nothing_raised { res.fetch }
+      assert_equal(0, res.result_count, "Zero-row select #result_count post-fetch was incorrect")
+    end
+
+    dbh.execute('select count(1) from RUBYFB_TEST') do |res|
+      assert_equal(1, res.result_count, "One-row select #result_count pre-fetch was incorrect")
+      assert_nothing_raised { res.fetch }
+      assert_equal(1, res.result_count, "SELECT count(1) #result_count was incorrect")
+    end
+  end
 end

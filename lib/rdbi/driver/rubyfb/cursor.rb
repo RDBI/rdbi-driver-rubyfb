@@ -3,21 +3,21 @@ require 'rubyfb'
 
 class RDBI::Driver::Rubyfb
 
-  ##
-  # Parent class for Driver::Rubyfb cursors, responsible for
-  # affected_count, @index and (via RDBI::Cursor) handle.
-  #
-  class BaseCursor < RDBI::Cursor
+  # :nodoc:
+  module CursorAffectedCountImpl
     def affected_count
       @affected_count ||= (handle.kind_of?(Numeric) ? handle : 0)
     end
-  end # -- BaseCursor
+  end # -- CursorAffectedCountImpl
 
   ##
-  # Simple rewindable cursor, reading all results into memory and closing
-  # the underlying handle.
+  # Simple rewindable cursor, reading all results into memory.
   #
-  class ArrayCursor < BaseCursor
+  # Not instantiated nor accessed directly.  Call Database#execute() or
+  # Statement#execute() with 'rewindable_result = true'
+  class ArrayCursor < RDBI::Cursor
+    include CursorAffectedCountImpl
+
     def initialize(rfb_handle)
       super(rfb_handle)
       @index = 0
@@ -83,12 +83,16 @@ class RDBI::Driver::Rubyfb
   end # -- class ArrayCursor
 
   ##
-  # Non-rewindable cursor class which does not load all rows into memory.
-  class ForwardOnlyCursor < BaseCursor
+  # Non-rewindable cursor class, which does not load all rows into memory.
+  #
+  # Not instantiated nor accessed directly.  Call Database#execute() or
+  # Statement#execute() with 'rewindable_result = false'
+  class ForwardOnlyCursor < RDBI::Cursor
+    include CursorAffectedCountImpl
     # :nodoc:
     # RDBI::Cursor#each relies on last_row?(), but Rubyfb::Cursor does
     # not know its result set size in advance, and does not know that it
-    # is #exhausted? until we attempt to move past the end...
+    # is #exhausted? until we attempt to move past the end.  So...
     def each
       while row = next_row
         yield row
@@ -157,8 +161,8 @@ class RDBI::Driver::Rubyfb
     end
 
     def rewind
-      # Yuck - special case ignore rewind at index 0, since  #as(:Blah)
-      # forces a #rewind()
+      # Yuck - special case ignore rewind at index 0, since
+      # ResultSet#as(:Blah) infelicitously forces a #rewind()
       return if 0 == result_count
       raise RDBI::Cursor::NotRewindableError.new('#rewind() requested on non-rewindable cursor')
     end

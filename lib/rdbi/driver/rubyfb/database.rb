@@ -95,8 +95,12 @@ class RDBI::Driver::Rubyfb::Database < RDBI::Database
     RDBI::Driver::Rubyfb::Statement.new(query, self, @fb_cxn, @fb_txns[-1], @fb_dialect)
   end
 
-  # Return the elapsed time taken to check the database connection, or
-  # an RDBI::DisconnectedError if not connected
+  # Return a true value if the database is still connected, or raise
+  # RDBI::DisconnectedError.
+  #
+  # At present this method returns the time taken to check the connection,
+  # however, these semantics are not portable across drivers, and may change
+  # within this driver, and so should not be relied upon.
   def ping
     # perl-DBD-InterBase calls isc_database_info(), but rubyfb-0.5.5 does
     # not expose that interface
